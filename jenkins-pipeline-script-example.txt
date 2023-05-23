@@ -1,0 +1,54 @@
+node {
+
+    stage("Git Clone"){
+            git credentialsId: 'GIT_HUB_CREDENTIALS', url: 'https://github.com/x64nik/springboot-with-docker.git'
+        }
+    
+    stage("Docker build"){
+        sh 'docker version'
+        sh 'docker build -t docker-compose-flask-app .'
+        sh 'docker image list'
+        sh 'docker tag docker-compose-flask-app x64nik/docker-compose-flask-app:docker-compose-flask-app'
+    } 
+
+    
+    
+    stage("Docker Login"){
+        withCredentials([string(credentialsId: 'DOCKER_HUB_PASSWORD', variable: 'PASSWORD')]) {
+            sh 'docker login -u x64nik -p $PASSWORD'
+        }
+    } 
+    
+    stage("Push Image to Docker Hub"){
+        sh 'docker push  x64nik/docker-compose-flask-app:docker-compose-flask-app'
+    }
+
+    stage("SSH Into k8s Server") {
+        def remote = [:]
+        remote.name = 'K8S master proxmox'
+        remote.host = '192.168.0.201'
+        remote.user = 'master'
+        remote.password = 'password'
+        remote.allowAnyHosts = true
+        
+        stage('Put k8s-spring-boot-deployment.yml onto k8smaster') {
+            sshPut remote: remote, from: 'k8s-spring-boot-deployment.yml', into: '.'
+        }
+
+
+        stage('Deploy spring boot') {
+          sshCommand remote: remote, command: "kubectl apply -f k8s-spring-boot-deployment.yml"
+        }
+
+    }          
+
+    
+    
+
+    
+
+    
+
+    
+    
+}
